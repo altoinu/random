@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>2次関数ジャンプのデモ (v2.3: 全コメント復元版)</title>
+    <title>2次関数ジャンプのデモ (v2.5: 完全修正版)</title>
     <style>
         body { font-family: sans-serif; text-align: center; }
         #game-world {
@@ -277,7 +277,29 @@
                 //
                 // この計算が、ものすごい速さで繰り返されて、放物線を描いている。
                 let y = (a * Math.pow(x, 2)) + (b * x) + c;
-                
+
+                // 1. 先に着地判定を行い、yとxの最終値を確定させる
+                // 高さ(y)が0より小さくなったら、地面に着地したということ。
+                // 2次方程式 y = 0 の解 (x=0 と x=-b/a) のうち、x=-b/a に到達したことを意味する。
+                if (y < 0) {
+                    y = 0;
+                    isJumping = false;
+                    x = b / (-a); 
+                    jumpHorizontalVelocity = 0;
+                }
+
+                // 2. 確定したyの値を使ってキャラクターの見た目の位置を更新
+                let y_css = GROUND_Y_PX + (y * Y_SCALE);
+                character.style.bottom = `${y_css}px`;
+
+                // 3. 確定した位置情報を使って、放物線と座標点を描画
+                if (drawParabola) {
+                    const currentX_center = currentHorizontalPos + (character.offsetWidth / 2);
+                    const currentY_center = canvas.height - y_css - (character.offsetHeight / 2);
+                    ctx.lineTo(currentX_center, currentY_center);
+                    ctx.stroke();
+                }
+
                 if (showCoordinates) {
                     const currentIntX = Math.round(x);
                     if (currentIntX > 0 && Math.abs(x - currentIntX) < 0.05 && !loggedIntegers[currentIntX]) {
@@ -287,7 +309,7 @@
                         coordText.className = 'coordinate-text';
                         coordText.innerText = `(${currentIntX}, ${intY.toFixed(1)})`;
                         const textX = currentHorizontalPos + character.offsetWidth;
-                        const textY = canvas.height - (GROUND_Y_PX + (y * Y_SCALE)) - character.offsetHeight;
+                        const textY = canvas.height - y_css - character.offsetHeight;
                         coordText.style.left = `${textX}px`;
                         coordText.style.top = `${textY}px`;
                         gameWorld.appendChild(coordText);
@@ -295,32 +317,13 @@
                         const coordDot = document.createElement('div');
                         coordDot.className = 'coordinate-dot';
                         const dotX = currentHorizontalPos + (character.offsetWidth / 2);
-                        const dotY = canvas.height - (GROUND_Y_PX + (y * Y_SCALE)) - (character.offsetHeight / 2);
+                        const dotY = canvas.height - y_css - (character.offsetHeight / 2);
                         coordDot.style.left = `${dotX}px`;
                         coordDot.style.top = `${dotY}px`;
                         gameWorld.appendChild(coordDot);
 
                         loggedIntegers[currentIntX] = true;
                     }
-                }
-                
-                // 高さ(y)が0より小さくなったら、地面に着地したということ。
-                // 2次方程式 y = 0 の解 (x=0 と x=-b/a) のうち、x=-b/a に到達したことを意味する。
-                if (y < 0) {
-                    y = 0;
-                    isJumping = false;
-                    x = b / (-a);
-                    jumpHorizontalVelocity = 0;
-                }
-
-                let y_css = GROUND_Y_PX + (y * Y_SCALE);
-                character.style.bottom = `${y_css}px`;
-
-                if (drawParabola) {
-                    const currentX_center = currentHorizontalPos + (character.offsetWidth / 2);
-                    const currentY_center = canvas.height - y_css - (character.offsetHeight / 2);
-                    ctx.lineTo(currentX_center, currentY_center);
-                    ctx.stroke();
                 }
 
                 timeDisplay.innerText = x.toFixed(2);
