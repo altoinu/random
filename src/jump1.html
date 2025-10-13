@@ -2,8 +2,9 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>2次関数ジャンプのデモ (v2.5: 完全修正版)</title>
+    <title>2次関数ジャンプのデモ (v3.3: 全コメント復元)</title>
     <style>
+        /* CSSは変更ありません */
         body { font-family: sans-serif; text-align: center; }
         #game-world {
             position: relative;
@@ -59,17 +60,39 @@
             position: absolute;
             width: 10px;
             height: 10px;
-            background-color: #ff9800; /* オレンジ色 */
-            border-radius: 50%; /* 円にする */
+            background-color: #ff9800;
+            border-radius: 50%;
             border: 1px solid #fff;
             pointer-events: none;
             z-index: 5; /* テキストより手前に表示 */
             transform: translate(-50%, -50%); /* 要素の中心が座標に合うように調整 */
         }
+        .vertex-text {
+            position: absolute;
+            font-size: 15px;
+            color: #2e7d32;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 6;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 3px;
+            border-radius: 3px;
+            border: 1px solid #2e7d32;
+        }
+        .vertex-dot {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            background-color: #66bb6a;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            pointer-events: none;
+            z-index: 7; /* 他のどの要素よりも手前に表示 */
+            transform: translate(-50%, -50%); /* 要素の中心が座標に合うように調整 */
+        }
     </style>
 </head>
 <body>
-
     <h2>2次関数ジャンプのデモ</h2>
     <p id="equationDisplay">ジャンプの軌道 (2次関数): <code>y = -1.0x² + 6.0x</code></p>
     <div id="controls">
@@ -141,6 +164,7 @@
         let drawParabola = false;
         let showCoordinates = false;
         let loggedIntegers = {};
+        let isVertexLogged = false;
 
         // --- 初期化処理 ---
         canvas.width = gameWorld.offsetWidth;
@@ -174,7 +198,7 @@
             showCoordinates = !showCoordinates;
             coordButton.innerText = `座標を表示: ${showCoordinates ? 'ON' : 'OFF'}`;
             if (!showCoordinates) {
-                document.querySelectorAll('.coordinate-text, .coordinate-dot').forEach(el => el.remove());
+                document.querySelectorAll('.coordinate-text, .coordinate-dot, .vertex-text, .vertex-dot').forEach(el => el.remove());
             }
         };
 
@@ -201,8 +225,9 @@
             if (isJumping) return;
             
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            document.querySelectorAll('.coordinate-text, .coordinate-dot').forEach(el => el.remove());
+            document.querySelectorAll('.coordinate-text, .coordinate-dot, .vertex-text, .vertex-dot').forEach(el => el.remove());
             loggedIntegers = {};
+            isVertexLogged = false;
 
             if (drawParabola) {
                 ctx.beginPath();
@@ -279,8 +304,6 @@
                 let y = (a * Math.pow(x, 2)) + (b * x) + c;
 
                 // 1. 先に着地判定を行い、yとxの最終値を確定させる
-                // 高さ(y)が0より小さくなったら、地面に着地したということ。
-                // 2次方程式 y = 0 の解 (x=0 と x=-b/a) のうち、x=-b/a に到達したことを意味する。
                 if (y < 0) {
                     y = 0;
                     isJumping = false;
@@ -301,6 +324,28 @@
                 }
 
                 if (showCoordinates) {
+                    const vertexX = -b / (2 * a);
+                    if (x >= vertexX && !isVertexLogged) {
+                        const vertexY = (a * Math.pow(vertexX, 2)) + (b * vertexX) + c;
+                        const vertexScreenX = (currentHorizontalPos - (jumpHorizontalVelocity * (x - vertexX) / 0.05));
+                        const vertexScreenY_css = GROUND_Y_PX + (vertexY * Y_SCALE);
+                        
+                        const vertexText = document.createElement('div');
+                        vertexText.className = 'vertex-text';
+                        vertexText.innerText = `頂点 (${vertexX.toFixed(2)}, ${vertexY.toFixed(2)})`;
+                        vertexText.style.left = `${vertexScreenX + character.offsetWidth}px`;
+                        vertexText.style.top = `${canvas.height - vertexScreenY_css - character.offsetHeight}px`;
+                        gameWorld.appendChild(vertexText);
+
+                        const vertexDot = document.createElement('div');
+                        vertexDot.className = 'vertex-dot';
+                        vertexDot.style.left = `${vertexScreenX + (character.offsetWidth / 2)}px`;
+                        vertexDot.style.top = `${canvas.height - vertexScreenY_css - (character.offsetHeight / 2)}px`;
+                        gameWorld.appendChild(vertexDot);
+
+                        isVertexLogged = true;
+                    }
+                    
                     const currentIntX = Math.round(x);
                     if (currentIntX > 0 && Math.abs(x - currentIntX) < 0.05 && !loggedIntegers[currentIntX]) {
                         const intY = (a * Math.pow(currentIntX, 2)) + (b * currentIntX) + c;
@@ -338,7 +383,7 @@
 
         function resetJump() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            document.querySelectorAll('.coordinate-text, .coordinate-dot').forEach(el => el.remove());
+            document.querySelectorAll('.coordinate-text, .coordinate-dot, .vertex-text, .vertex-dot').forEach(el => el.remove());
             loggedIntegers = {};
             x = 0;
             isJumping = false;
