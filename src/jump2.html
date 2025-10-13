@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>2次関数でジャンプ！</title>
+    <style>
+        body { display: flex; flex-direction: column; align-items: center; font-family: sans-serif; }
+        canvas { border: 1px solid black; background-color: #f0f8ff; }
+        button { font-size: 1.5em; margin: 10px; padding: 10px 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>2次関数でジャンプ！</h1>
+    <p>y = -x² + 6x</p>
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
+    <button id="jumpButton">ジャンプ！</button>
+
+    <script>
+        // --- 設定 ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const jumpButton = document.getElementById('jumpButton');
+
+        // キャラクターのプロパティ
+        const char = {
+            width: 30,
+            height: 30,
+            color: '#e63946'
+        };
+
+        // 地面の高さ (Canvasの下から30px)
+        const groundY = canvas.height - 30;
+        
+        // 描画のスケール（ゲーム内の1mを何ピクセルで描画するか）
+        const scale = 30;
+
+        // アニメーションの状態を管理する変数
+        let time = 0; // ゲーム内の時間 (方程式のxに対応)
+        let animationFrameId = null;
+
+        // --- 描画関数 ---
+        function draw() {
+            // 1. キャンバスをクリア
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 2. 地面を描画
+            ctx.fillStyle = '#2a9d8f';
+            ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+            
+            // 3. 2次関数で高さを計算
+            // y = -x^2 + 6x
+            const mathX = time;
+            const mathY = -Math.pow(mathX, 2) + (6 * mathX);
+            
+            // 4. キャラクターの位置を計算
+            // canvasのY座標は上が0なので、地面の高さから計算した高さを引く
+            const screenX = 50 + (mathX * scale); // X方向は時間と共に進む
+            const screenY = groundY - (mathY * scale) - char.height; // Y方向は計算結果
+
+            // 5. キャラクターを描画
+            ctx.fillStyle = char.color;
+            ctx.fillRect(screenX, screenY, char.width, char.height);
+
+            // 6. 時間を進める
+            time += 0.05; // この値を調整するとジャンプの速さが変わる
+
+            // 7. 着地したらアニメーションを止める
+            if (mathY < 0 && time > 0) {
+                cancelAnimationFrame(animationFrameId);
+                jumpButton.disabled = false; // ボタンを再度押せるようにする
+                return;
+            }
+
+            // 8. 次のフレームをリクエスト
+            animationFrameId = requestAnimationFrame(draw);
+        }
+
+        // --- イベントリスナー ---
+        jumpButton.addEventListener('click', () => {
+            // アニメーションをリセットして開始
+            time = 0;
+            jumpButton.disabled = true; // アニメーション中はボタンを無効化
+            
+            // もし前のアニメーションが残っていたらキャンセル
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+            
+            draw();
+        });
+        
+        // --- 初期描画 ---
+        // ページ読み込み時にキャラクターを地面に表示しておく
+        function drawInitialState() {
+             ctx.clearRect(0, 0, canvas.width, canvas.height);
+             ctx.fillStyle = '#2a9d8f';
+             ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+             ctx.fillStyle = char.color;
+             ctx.fillRect(50, groundY - char.height, char.width, char.height);
+        }
+        drawInitialState();
+
+    </script>
+</body>
+</html>

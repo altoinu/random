@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>2次関数ジャンプのデモ (v2.3: 全コメント復元版)</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; }
+        #game-world {
+            position: relative;
+            width: 800px;
+            height: 400px;
+            margin: 20px auto;
+            border: 2px solid #000;
+            background-color: #e0f7fa;
+            overflow: hidden;
+        }
+        #parabola-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 1;
+        }
+        #ground {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 30px;
+            background-color: #4caf50;
+            z-index: 2;
+        }
+        #character {
+            position: absolute;
+            bottom: 30px;
+            left: 50px;
+            width: 30px;
+            height: 30px;
+            background-color: #f44336;
+            z-index: 3;
+        }
+        #controls { margin-bottom: 10px; display: inline-block; text-align: left; padding: 10px; border: 1px solid #ccc; border-radius: 8px;}
+        .control-group { margin-bottom: 8px; }
+        .slider-container { display: flex; align-items: center; margin-top: 8px; }
+        .slider-container span { min-width: 40px; text-align: right; margin-left: 10px; font-weight: bold; }
+        p { font-size: 1.2em; }
+        #instructions { font-size: 0.9em; color: #555; margin-top: 10px; }
+        .coordinate-text {
+            position: absolute;
+            font-size: 14px;
+            color: #d32f2f;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 4;
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 2px;
+            border-radius: 3px;
+        }
+        .coordinate-dot {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #ff9800; /* オレンジ色 */
+            border-radius: 50%; /* 円にする */
+            border: 1px solid #fff;
+            pointer-events: none;
+            z-index: 5; /* テキストより手前に表示 */
+            transform: translate(-50%, -50%); /* 要素の中心が座標に合うように調整 */
+        }
+    </style>
+</head>
+<body>
+
+    <h2>2次関数ジャンプのデモ</h2>
+    <p id="equationDisplay">ジャンプの軌道 (2次関数): <code>y = -1.0x² + 6.0x</code></p>
+    <div id="controls">
+        <div class="control-group">
+            <button id="jumpButton">ジャンプ (Space)</button>
+            <button id="resetButton">リセット</button>
+            <button id="parabolaButton">放物線を描画: OFF</button>
+            <button id="coordButton">座標を表示: OFF</button>
+        </div>
+        <div class="slider-container">
+            a (重力): <input type="range" id="aSlider" min="-2" max="-0.1" step="0.1" value="-1">
+            <span id="aValue">-1.0</span>
+        </div>
+        <div class="slider-container">
+            b (初速): <input type="range" id="bSlider" min="1" max="15" step="0.5" value="6">
+            <span id="bValue">6.0</span>
+        </div>
+    </div>
+    <p id="instructions">
+        キーボードの **← →** で左右移動、**Space** キーでジャンプ！
+    </p>
+    <p>
+        時間 (x): <span id="timeDisplay">0.00</span>
+        / 高さ (y): <span id="heightDisplay">0.00</span>
+    </p>
+    
+    <div id="game-world">
+        <canvas id="parabola-canvas"></canvas>
+        <div id="ground"></div>
+        <div id="character"></div>
+    </div>
+
+    <script>
+        // --- 数学の変数と係数 (y = ax^2 + bx + c) ---
+        let a = -1;  // x^2の係数。マイナスなので上に凸(山なり)の放物線になる。
+        let b = 6;   // xの係数。ジャンプの初速を決め、値が大きいほど高く飛ぶ。
+        const c = 0; // 定数項。地面(高さ0)からジャンプするので0。
+        let x = 0;   // 2次関数の変数 'x' (ジャンプ開始からの時間)。
+        // つまり、このプログラムは y = ax^2 + bx + c の式を元に動いている。
+
+        // --- ゲームとしての見た目を調整する設定 ---
+        const GROUND_Y_PX = 30;
+        const HORIZONTAL_SPEED = 4;
+        const Y_SCALE = 30;
+
+        // --- HTML要素の取得 ---
+        const gameWorld = document.getElementById('game-world');
+        const character = document.getElementById('character');
+        const jumpButton = document.getElementById('jumpButton');
+        const resetButton = document.getElementById('resetButton');
+        const parabolaButton = document.getElementById('parabolaButton');
+        const coordButton = document.getElementById('coordButton');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const heightDisplay = document.getElementById('heightDisplay');
+        const canvas = document.getElementById('parabola-canvas');
+        const ctx = canvas.getContext('2d');
+        const equationDisplay = document.getElementById('equationDisplay');
+        const aSlider = document.getElementById('aSlider');
+        const aValue = document.getElementById('aValue');
+        const bSlider = document.getElementById('bSlider');
+        const bValue = document.getElementById('bValue');
+
+        // --- 状態を保存する変数 ---
+        let isJumping = false;
+        let animationFrameId = null;
+        let currentHorizontalPos = 50;
+        let jumpHorizontalVelocity = 0;
+        let keysPressed = {};
+        let drawParabola = false;
+        let showCoordinates = false;
+        let loggedIntegers = {};
+
+        // --- 初期化処理 ---
+        canvas.width = gameWorld.offsetWidth;
+        canvas.height = gameWorld.offsetHeight;
+
+        // --- イベントリスナー ---
+        document.addEventListener('keydown', (e) => {
+            keysPressed[e.key] = true;
+            if (e.key === ' ' && !isJumping) {
+                e.preventDefault();
+                startJump();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            delete keysPressed[e.key];
+        });
+
+        jumpButton.onclick = startJump;
+        resetButton.onclick = resetJump;
+
+        parabolaButton.onclick = () => {
+            drawParabola = !drawParabola;
+            parabolaButton.innerText = `放物線を描画: ${drawParabola ? 'ON' : 'OFF'}`;
+            if (!drawParabola) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        };
+
+        coordButton.onclick = () => {
+            showCoordinates = !showCoordinates;
+            coordButton.innerText = `座標を表示: ${showCoordinates ? 'ON' : 'OFF'}`;
+            if (!showCoordinates) {
+                document.querySelectorAll('.coordinate-text, .coordinate-dot').forEach(el => el.remove());
+            }
+        };
+
+        aSlider.addEventListener('input', (e) => {
+            a = parseFloat(e.target.value);
+            aValue.textContent = a.toFixed(1);
+            updateEquationDisplay();
+            resetJump();
+        });
+
+        bSlider.addEventListener('input', (e) => {
+            b = parseFloat(e.target.value);
+            bValue.textContent = b.toFixed(1);
+            updateEquationDisplay();
+            resetJump();
+        });
+        
+        function updateEquationDisplay() {
+            equationDisplay.innerHTML = `ジャンプの軌道 (2次関数): <code>y = ${a.toFixed(1)}x² + ${b.toFixed(1)}x</code>`;
+        }
+        
+        // --- 関数定義 ---
+        function startJump() {
+            if (isJumping) return;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            document.querySelectorAll('.coordinate-text, .coordinate-dot').forEach(el => el.remove());
+            loggedIntegers = {};
+
+            if (drawParabola) {
+                ctx.beginPath();
+                ctx.strokeStyle = 'rgba(0, 0, 255, 0.7)';
+                ctx.lineWidth = 3;
+                const startX_center = currentHorizontalPos + (character.offsetWidth / 2);
+                const startY_center = canvas.height - GROUND_Y_PX - (character.offsetHeight / 2);
+                ctx.moveTo(startX_center, startY_center);
+            }
+            
+            if (showCoordinates) {
+                const coordText = document.createElement('div');
+                coordText.className = 'coordinate-text';
+                coordText.innerText = `(0, 0)`;
+                const textX = currentHorizontalPos + character.offsetWidth;
+                const textY = canvas.height - GROUND_Y_PX - character.offsetHeight;
+                coordText.style.left = `${textX}px`;
+                coordText.style.top = `${textY}px`;
+                gameWorld.appendChild(coordText);
+            }
+
+            isJumping = true;
+            x = 0;
+
+            if (keysPressed['ArrowRight']) {
+                jumpHorizontalVelocity = HORIZONTAL_SPEED;
+            } else if (keysPressed['ArrowLeft']) {
+                jumpHorizontalVelocity = -HORIZONTAL_SPEED;
+            } else {
+                jumpHorizontalVelocity = 0;
+            }
+
+            if (!animationFrameId) {
+                animationFrameId = requestAnimationFrame(gameLoop);
+            }
+        }
+        
+        // ★★★ ゲームの心臓部（メインループ） ★★★
+        function gameLoop() {
+            if (isJumping) {
+                currentHorizontalPos += jumpHorizontalVelocity;
+            } else {
+                if (keysPressed['ArrowLeft']) {
+                    currentHorizontalPos -= HORIZONTAL_SPEED;
+                }
+                if (keysPressed['ArrowRight']) {
+                    currentHorizontalPos += HORIZONTAL_SPEED;
+                }
+            }
+            
+            currentHorizontalPos = Math.max(0, Math.min(gameWorld.offsetWidth - character.offsetWidth, currentHorizontalPos));
+            character.style.left = `${currentHorizontalPos}px`;
+
+            if (isJumping) {
+                x += 0.05;
+
+                // ★★★ ここが数学の核心！ 2次関数を使ってジャンプの高さを計算 ★★★
+                // 教科書の式 y = ax^2 + bx + c がそのままコードになっている！
+                //
+                // 例えば、a=-1, b=6 の時:
+                // x が 1 の時 (上昇中):
+                // y = (-1)*(1*1) + 6*1 + 0 = -1 + 6 = 5
+                //
+                // x が 3 の時 (頂点):
+                // y = (-1)*(3*3) + 6*3 + 0 = -9 + 18 = 9
+                //
+                // x が 5 の時 (下降中):
+                // y = (-1)*(5*5) + 6*5 + 0 = -25 + 30 = 5  <- x=1の時と同じ高さ！
+                //
+                // x が 6 の時 (着地):
+                // y = (-1)*(6*6) + 6*6 + 0 = -36 + 36 = 0
+                //
+                // この計算が、ものすごい速さで繰り返されて、放物線を描いている。
+                let y = (a * Math.pow(x, 2)) + (b * x) + c;
+                
+                if (showCoordinates) {
+                    const currentIntX = Math.round(x);
+                    if (currentIntX > 0 && Math.abs(x - currentIntX) < 0.05 && !loggedIntegers[currentIntX]) {
+                        const intY = (a * Math.pow(currentIntX, 2)) + (b * currentIntX) + c;
+                        
+                        const coordText = document.createElement('div');
+                        coordText.className = 'coordinate-text';
+                        coordText.innerText = `(${currentIntX}, ${intY.toFixed(1)})`;
+                        const textX = currentHorizontalPos + character.offsetWidth;
+                        const textY = canvas.height - (GROUND_Y_PX + (y * Y_SCALE)) - character.offsetHeight;
+                        coordText.style.left = `${textX}px`;
+                        coordText.style.top = `${textY}px`;
+                        gameWorld.appendChild(coordText);
+                        
+                        const coordDot = document.createElement('div');
+                        coordDot.className = 'coordinate-dot';
+                        const dotX = currentHorizontalPos + (character.offsetWidth / 2);
+                        const dotY = canvas.height - (GROUND_Y_PX + (y * Y_SCALE)) - (character.offsetHeight / 2);
+                        coordDot.style.left = `${dotX}px`;
+                        coordDot.style.top = `${dotY}px`;
+                        gameWorld.appendChild(coordDot);
+
+                        loggedIntegers[currentIntX] = true;
+                    }
+                }
+                
+                // 高さ(y)が0より小さくなったら、地面に着地したということ。
+                // 2次方程式 y = 0 の解 (x=0 と x=-b/a) のうち、x=-b/a に到達したことを意味する。
+                if (y < 0) {
+                    y = 0;
+                    isJumping = false;
+                    x = b / (-a);
+                    jumpHorizontalVelocity = 0;
+                }
+
+                let y_css = GROUND_Y_PX + (y * Y_SCALE);
+                character.style.bottom = `${y_css}px`;
+
+                if (drawParabola) {
+                    const currentX_center = currentHorizontalPos + (character.offsetWidth / 2);
+                    const currentY_center = canvas.height - y_css - (character.offsetHeight / 2);
+                    ctx.lineTo(currentX_center, currentY_center);
+                    ctx.stroke();
+                }
+
+                timeDisplay.innerText = x.toFixed(2);
+                heightDisplay.innerText = y.toFixed(2);
+            } else {
+                timeDisplay.innerText = '0.00';
+                heightDisplay.innerText = '0.00';
+            }
+            
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function resetJump() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            document.querySelectorAll('.coordinate-text, .coordinate-dot').forEach(el => el.remove());
+            loggedIntegers = {};
+            x = 0;
+            isJumping = false;
+            jumpHorizontalVelocity = 0;
+            currentHorizontalPos = 50;
+            character.style.left = `${currentHorizontalPos}px`;
+            character.style.bottom = `${GROUND_Y_PX}px`;
+            timeDisplay.innerText = '0.00';
+            heightDisplay.innerText = '0.00';
+            keysPressed = {};
+        }
+
+        animationFrameId = requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
