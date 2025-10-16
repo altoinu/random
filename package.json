@@ -7,7 +7,7 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "format": "git ls-files --modified --others --exclude-standard | grep -E '\\.(md|css|js|cjs|mjs|jsx|ts|cts|mts|tsx)$' | xargs prettier --write",
+    "format": "(git diff --name-only HEAD; git ls-files --others --exclude-standard) | grep -E '\\.(js|cjs|mjs|jsx|ts|cts|mts|tsx)$' | xargs prettier --write",
     "format:all": "prettier --write \"**/*.{md,css,js,cjs,mjs,jsx,ts,cts,mts,tsx}\"",
     "lint": "eslint . --fix",
     "test": "jest",
