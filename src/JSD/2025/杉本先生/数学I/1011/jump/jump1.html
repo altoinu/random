@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>2次関数ジャンプのデモ (v3.5: リファクタリング版)</title>
+    <title>2次関数ジャンプのデモ (v4.0 - Step 1: UI Only)</title>
     <style>
         /* CSSは変更ありません */
         body { font-family: sans-serif; text-align: center; }
@@ -112,6 +112,39 @@
             z-index: 5;
             transform: translate(-50%, -50%);
         }
+        /* ★★★ ここから追加 ★★★ */
+        #target-coin {
+            position: absolute;
+            width: 25px;
+            height: 25px;
+            background-color: #ffeb3b; /* 黄色 */
+            border: 2px solid #fbc02d;
+            border-radius: 50%;
+            left: 387.5px; /* 中央に配置 */
+            bottom: 130px; /* 初期位置 */
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 16px;
+            color: #a1887f;
+        }
+        #discriminant-controls { 
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 2px dashed #ccc;
+        }
+        #discriminant-result {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f1f1f1;
+            border-radius: 5px;
+            min-height: 50px;
+            text-align: center;
+            font-size: 1.1em;
+        }
+        /* ★★★ ここまで追加 ★★★ */
     </style>
 </head>
 <body>
@@ -125,28 +158,44 @@
             <button id="coordButton">座標を表示: OFF</button>
         </div>
         <div class="slider-container">
-            a (重力): <input type="range" id="aSlider" min="-2" max="-0.1" step="0.1" value="-1">
+            a (x²の係数, 重力): <input type="range" id="aSlider" min="-2" max="-0.1" step="0.1" value="-1">
             <span id="aValue">-1.0</span>
         </div>
         <div class="slider-container">
-            b (初速): <input type="range" id="bSlider" min="1" max="15" step="0.5" value="6">
+            b (xの係数, 初速): <input type="range" id="bSlider" min="1" max="15" step="0.5" value="6">
             <span id="bValue">6.0</span>
         </div>
+        <!-- ★★★ ここから追加 ★★★ -->
+        <div class="slider-container">
+            c (定数項, 開始高さ): <input type="range" id="cSlider" min="-5" max="5" step="0.5" value="0">
+            <span id="cValue">0.0</span>
+        </div>
+        <div id="discriminant-controls">
+            <p>コインの高さ (y=0) に届くか？</p>
+            <button id="calculateD">判別式 D = b²-4ac を計算</button>
+            <div id="discriminant-result">
+                ↑のボタンを押して結果を確認
+            </div>
+        </div>
+        <!-- ★★★ ここまで追加 ★★★ -->
     </div>
     <p id="instructions">
         キーボードの **← →** で左右移動、**Space** キーでジャンプ！
     </p>
     <p>
         時間 (x): <span id="timeDisplay">0.00</span>
-        / 高さ (y): <span id="heightDisplay">0.00</span>
+        / 相対的な高さ (y): <span id="heightDisplay">0.00</span>
     </p>
     
     <div id="game-world">
+        <!-- ★★★ ここを追加 ★★★ -->
+        <div id="target-coin">0</div>
         <canvas id="parabola-canvas"></canvas>
         <div id="ground"></div>
         <div id="character"></div>
     </div>
 
+    <!-- ★★★ SCRIPT TAG IS UNCHANGED FROM v3.5 ★★★ -->
     <script>
         // --- 数学の変数と係数 (y = ax^2 + bx + c) ---
         let a = -1;  // x^2の係数。マイナスなので上に凸(山なり)の放物線になる。
@@ -381,7 +430,6 @@
                         loggedIntegers[currentIntX] = true;
                     }
                     
-                    // ★★★ ここからが修正箇所 ★★★
                     // 着地点の表示ロジック (ジャンプが終わった瞬間に一度だけ実行)
                     if (!isJumping && !isLandingLogged) {
                         const landingText = document.createElement('div');
@@ -434,3 +482,4 @@
     </script>
 </body>
 </html>
+
