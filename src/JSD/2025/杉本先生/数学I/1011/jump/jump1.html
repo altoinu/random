@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>2次関数ジャンプのデモ (v4.0 - Step 1: UI Only)</title>
+    <title>2次関数ジャンプのデモ (v4.0 Final)</title>
     <style>
         /* CSSは変更ありません */
         body { font-family: sans-serif; text-align: center; }
@@ -112,7 +112,6 @@
             z-index: 5;
             transform: translate(-50%, -50%);
         }
-        /* ★★★ ここから追加 ★★★ */
         #target-coin {
             position: absolute;
             width: 25px;
@@ -121,7 +120,7 @@
             border: 2px solid #fbc02d;
             border-radius: 50%;
             left: 387.5px; /* 中央に配置 */
-            bottom: 130px; /* 初期位置 */
+            bottom: 130px; /* 初期位置 (JSで動的に設定されます) */
             z-index: 2;
             display: flex;
             align-items: center;
@@ -144,7 +143,6 @@
             text-align: center;
             font-size: 1.1em;
         }
-        /* ★★★ ここまで追加 ★★★ */
     </style>
 </head>
 <body>
@@ -165,10 +163,9 @@
             b (xの係数, 初速): <input type="range" id="bSlider" min="1" max="15" step="0.5" value="6">
             <span id="bValue">6.0</span>
         </div>
-        <!-- ★★★ ここから追加 ★★★ -->
         <div class="slider-container">
-            c (定数項, 開始高さ): <input type="range" id="cSlider" min="-5" max="5" step="0.5" value="0">
-            <span id="cValue">0.0</span>
+            c (定数項, 開始高さ): <input type="range" id="cSlider" min="-10" max="5" step="0.5" value="-5">
+            <span id="cValue">-5.0</span>
         </div>
         <div id="discriminant-controls">
             <p>コインの高さ (y=0) に届くか？</p>
@@ -177,7 +174,6 @@
                 ↑のボタンを押して結果を確認
             </div>
         </div>
-        <!-- ★★★ ここまで追加 ★★★ -->
     </div>
     <p id="instructions">
         キーボードの **← →** で左右移動、**Space** キーでジャンプ！
@@ -188,26 +184,25 @@
     </p>
     
     <div id="game-world">
-        <!-- ★★★ ここを追加 ★★★ -->
         <div id="target-coin">0</div>
         <canvas id="parabola-canvas"></canvas>
         <div id="ground"></div>
         <div id="character"></div>
     </div>
 
-    <!-- ★★★ SCRIPT TAG IS UNCHANGED FROM v3.5 ★★★ -->
     <script>
         // --- 数学の変数と係数 (y = ax^2 + bx + c) ---
         let a = -1;  // x^2の係数。マイナスなので上に凸(山なり)の放物線になる。
         let b = 6;   // xの係数。ジャンプの初速を決め、値が大きいほど高く飛ぶ。
-        const c = 0; // 定数項。地面(高さ0)からジャンプするので0。
+        let c = -5;  // ★★★ constからletに変更し、初期値を-5に ★★★ 定数項。コインを基準(y=0)としたジャンプの開始高さ。
         let x = 0;   // 2次関数の変数 'x' (ジャンプ開始からの時間)。
         // つまり、このプログラムは y = ax^2 + bx + c の式を元に動いている。
 
         // --- ゲームとしての見た目を調整する設定 ---
-        const GROUND_Y_PX = 30;
-        const HORIZONTAL_SPEED = 4;
-        const Y_SCALE = 30;
+        const GROUND_Y_PX = 30; // 地面のCSS上の高さ(ピクセル)
+        const HORIZONTAL_SPEED = 4; // 左右移動のスピード
+        const Y_SCALE = 20; // y座標の1単位を何ピクセルで表示するかの縮尺
+        const COIN_BASE_Y_PX = 130; // 地面からコイン(y=0)までのピクセル距離
 
         // --- HTML要素の取得 ---
         const gameWorld = document.getElementById('game-world');
@@ -225,6 +220,11 @@
         const aValue = document.getElementById('aValue');
         const bSlider = document.getElementById('bSlider');
         const bValue = document.getElementById('bValue');
+        const cSlider = document.getElementById('cSlider');
+        const cValue = document.getElementById('cValue');
+        const calculateDButton = document.getElementById('calculateD');
+        const discriminantResult = document.getElementById('discriminant-result');
+        const targetCoin = document.getElementById('target-coin');
 
         // --- 状態を保存する変数 ---
         let isJumping = false;
@@ -241,6 +241,7 @@
         // --- 初期化処理 ---
         canvas.width = gameWorld.offsetWidth;
         canvas.height = gameWorld.offsetHeight;
+        targetCoin.style.bottom = `${COIN_BASE_Y_PX}px`;
 
         // --- イベントリスナー ---
         document.addEventListener('keydown', (e) => {
@@ -288,8 +289,38 @@
             resetJump();
         });
         
+        cSlider.addEventListener('input', (e) => {
+            c = parseFloat(e.target.value);
+            cValue.textContent = c.toFixed(1);
+            updateEquationDisplay();
+            resetJump();
+        });
+
+        calculateDButton.onclick = () => {
+            // ★★★ ここが数学の核心！ 判別式 D = b^2 - 4ac ★★★
+            //
+            // 2次方程式 ax^2 + bx + c = 0 が解を持つかどうかを調べるための「魔法の数字」。
+            // このプログラムでは、「放物線がコインの高さ(y=0)に届くか？」を判定している。
+            //
+            // D > 0: 解が2つ。放物線はy=0の直線と2回交わる (行きと帰りで2回チャンス！)。
+            // D = 0: 解が1つ。放物線はy=0の直線にちょうど接する (ギリギリ届く！)。
+            // D < 0: 解がない。放物線はy=0の直線に届かない…。
+            //
+            // この計算一つで、ジャンプする前に結果が分かるんだ！
+            const D = Math.pow(b, 2) - (4 * a * c);
+            let resultHTML = `D = ${b}² - 4*(${a})*(${c}) = <strong>${D.toFixed(2)}</strong><br>`;
+            
+            if (D >= 0) {
+                resultHTML += '<span style="color: blue;">D ≥ 0 なので、届く！</span>';
+            } else {
+                resultHTML += '<span style="color: red;">D < 0 なので、届かない…</span>';
+            }
+            discriminantResult.innerHTML = resultHTML;
+        };
+        
         function updateEquationDisplay() {
-            equationDisplay.innerHTML = `ジャンプの軌道 (2次関数): <code>y = ${a.toFixed(1)}x² + ${b.toFixed(1)}x</code>`;
+            const sign = c >= 0 ? '+' : '-';
+            equationDisplay.innerHTML = `ジャンプの軌道 (2次関数): <code>y = ${a.toFixed(1)}x² + ${b.toFixed(1)}x ${sign} ${Math.abs(c).toFixed(1)}</code>`;
         }
         
         // --- 関数定義 ---
@@ -306,17 +337,18 @@
                 ctx.beginPath();
                 ctx.strokeStyle = 'rgba(0, 0, 255, 0.7)';
                 ctx.lineWidth = 3;
+                const startY_css = COIN_BASE_Y_PX + (c * Y_SCALE);
                 const startX_center = currentHorizontalPos + (character.offsetWidth / 2);
-                const startY_center = canvas.height - GROUND_Y_PX - (character.offsetHeight / 2);
+                const startY_center = canvas.height - startY_css - (character.offsetHeight / 2);
                 ctx.moveTo(startX_center, startY_center);
             }
             
             if (showCoordinates) {
                 const coordText = document.createElement('div');
                 coordText.className = 'coordinate-text';
-                coordText.innerText = `(0, 0)`;
+                coordText.innerText = `(0, ${c.toFixed(1)})`;
                 const textX = currentHorizontalPos + character.offsetWidth;
-                const textY = canvas.height - GROUND_Y_PX - character.offsetHeight;
+                const textY = canvas.height - (COIN_BASE_Y_PX + (c * Y_SCALE)) - character.offsetHeight;
                 coordText.style.left = `${textX}px`;
                 coordText.style.top = `${textY}px`;
                 gameWorld.appendChild(coordText);
@@ -338,7 +370,6 @@
             }
         }
         
-        // ★★★ ゲームの心臓部（メインループ） ★★★
         function gameLoop() {
             if (isJumping) {
                 currentHorizontalPos += jumpHorizontalVelocity;
@@ -357,20 +388,20 @@
             if (isJumping) {
                 x += 0.05;
 
-                // ★★★ ここが数学の核心！ 2次関数を使ってジャンプの高さを計算 ★★★
-                // (教育用コメントはすべて保持)
+                // ★★★ ここが数学の核心！ 2次関数を使ってジャンプの「相対的な高さ」を計算 ★★★
+                // 教科書の式 y = ax^2 + bx + c がそのままコードになっている！
                 let y = (a * Math.pow(x, 2)) + (b * x) + c;
+                
+                let y_css = COIN_BASE_Y_PX + (y * Y_SCALE);
 
-                // 1. 先に着地判定を行い、yとxの最終値を確定させる
-                if (y < 0) {
-                    y = 0;
+                // 1. 先に着地判定(地面との衝突)を行い、yとxの最終値を確定させる
+                if (y_css < GROUND_Y_PX) {
+                    y_css = GROUND_Y_PX;
                     isJumping = false;
-                    x = -b / a; 
                     jumpHorizontalVelocity = 0;
                 }
 
                 // 2. 確定したyの値を使ってキャラクターの見た目の位置を更新
-                let y_css = GROUND_Y_PX + (y * Y_SCALE);
                 character.style.bottom = `${y_css}px`;
 
                 // 3. 確定した位置情報を使って、放物線と座標点を描画
@@ -387,7 +418,7 @@
                     if (x >= vertexX && !isVertexLogged) {
                         const vertexY = (a * Math.pow(vertexX, 2)) + (b * vertexX) + c;
                         const vertexScreenX = (currentHorizontalPos - (jumpHorizontalVelocity * (x - vertexX) / 0.05));
-                        const vertexScreenY_css = GROUND_Y_PX + (vertexY * Y_SCALE);
+                        const vertexScreenY_css = COIN_BASE_Y_PX + (vertexY * Y_SCALE);
                         
                         const vertexText = document.createElement('div');
                         vertexText.className = 'vertex-text';
@@ -432,9 +463,10 @@
                     
                     // 着地点の表示ロジック (ジャンプが終わった瞬間に一度だけ実行)
                     if (!isJumping && !isLandingLogged) {
+                        const groundY_math = (GROUND_Y_PX - COIN_BASE_Y_PX) / Y_SCALE;
                         const landingText = document.createElement('div');
                         landingText.className = 'landing-text';
-                        landingText.innerText = `着地点 (${x.toFixed(2)}, 0)`;
+                        landingText.innerText = `着地点 (y=${groundY_math.toFixed(1)})`;
                         const textX = currentHorizontalPos - landingText.offsetWidth - 5; 
                         const textY = canvas.height - GROUND_Y_PX - character.offsetHeight;
                         landingText.style.left = `${textX}px`;
@@ -456,8 +488,8 @@
                 timeDisplay.innerText = x.toFixed(2);
                 heightDisplay.innerText = y.toFixed(2);
             } else {
-                timeDisplay.innerText = '0.00';
-                heightDisplay.innerText = '0.00';
+                const currentY = (parseFloat(character.style.bottom) - COIN_BASE_Y_PX) / Y_SCALE;
+                heightDisplay.innerText = currentY.toFixed(2);
             }
             
             animationFrameId = requestAnimationFrame(gameLoop);
@@ -472,13 +504,17 @@
             jumpHorizontalVelocity = 0;
             currentHorizontalPos = 50;
             character.style.left = `${currentHorizontalPos}px`;
-            character.style.bottom = `${GROUND_Y_PX}px`;
+            character.style.bottom = `${COIN_BASE_Y_PX + (c * Y_SCALE)}px`;
             timeDisplay.innerText = '0.00';
-            heightDisplay.innerText = '0.00';
+            heightDisplay.innerText = c.toFixed(2);
             keysPressed = {};
         }
 
-        animationFrameId = requestAnimationFrame(gameLoop);
+        updateEquationDisplay();
+        resetJump();
+        if (!animationFrameId) {
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
     </script>
 </body>
 </html>
