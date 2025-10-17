@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>2次関数ジャンプのデモ (v3.3: 全コメント復元)</title>
+    <title>2次関数ジャンプのデモ (v3.5: リファクタリング版)</title>
     <style>
         /* CSSは変更ありません */
         body { font-family: sans-serif; text-align: center; }
@@ -60,8 +60,8 @@
             position: absolute;
             width: 10px;
             height: 10px;
-            background-color: #ff9800;
-            border-radius: 50%;
+            background-color: #ff9800; /* オレンジ色 */
+            border-radius: 50%; /* 円にする */
             border: 1px solid #fff;
             pointer-events: none;
             z-index: 5; /* テキストより手前に表示 */
@@ -70,7 +70,7 @@
         .vertex-text {
             position: absolute;
             font-size: 15px;
-            color: #2e7d32;
+            color: #2e7d32; /* 緑色 */
             font-weight: bold;
             pointer-events: none;
             z-index: 6;
@@ -83,12 +83,34 @@
             position: absolute;
             width: 14px;
             height: 14px;
-            background-color: #66bb6a;
+            background-color: #66bb6a; /* 緑色 */
             border-radius: 50%;
             border: 2px solid #fff;
             pointer-events: none;
             z-index: 7; /* 他のどの要素よりも手前に表示 */
             transform: translate(-50%, -50%); /* 要素の中心が座標に合うように調整 */
+        }
+        .landing-text {
+            position: absolute;
+            font-size: 14px;
+            color: #6a1b9a; /* 紫色 */
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 4;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 2px;
+            border-radius: 3px;
+        }
+        .landing-dot {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background-color: #ab47bc; /* 紫色 */
+            border-radius: 50%;
+            border: 1px solid #fff;
+            pointer-events: none;
+            z-index: 5;
+            transform: translate(-50%, -50%);
         }
     </style>
 </head>
@@ -165,6 +187,7 @@
         let showCoordinates = false;
         let loggedIntegers = {};
         let isVertexLogged = false;
+        let isLandingLogged = false;
 
         // --- 初期化処理 ---
         canvas.width = gameWorld.offsetWidth;
@@ -198,7 +221,7 @@
             showCoordinates = !showCoordinates;
             coordButton.innerText = `座標を表示: ${showCoordinates ? 'ON' : 'OFF'}`;
             if (!showCoordinates) {
-                document.querySelectorAll('.coordinate-text, .coordinate-dot, .vertex-text, .vertex-dot').forEach(el => el.remove());
+                document.querySelectorAll('.coordinate-text, .coordinate-dot, .vertex-text, .vertex-dot, .landing-text, .landing-dot').forEach(el => el.remove());
             }
         };
 
@@ -225,9 +248,10 @@
             if (isJumping) return;
             
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            document.querySelectorAll('.coordinate-text, .coordinate-dot, .vertex-text, .vertex-dot').forEach(el => el.remove());
+            document.querySelectorAll('.coordinate-text, .coordinate-dot, .vertex-text, .vertex-dot, .landing-text, .landing-dot').forEach(el => el.remove());
             loggedIntegers = {};
             isVertexLogged = false;
+            isLandingLogged = false;
 
             if (drawParabola) {
                 ctx.beginPath();
@@ -285,29 +309,14 @@
                 x += 0.05;
 
                 // ★★★ ここが数学の核心！ 2次関数を使ってジャンプの高さを計算 ★★★
-                // 教科書の式 y = ax^2 + bx + c がそのままコードになっている！
-                //
-                // 例えば、a=-1, b=6 の時:
-                // x が 1 の時 (上昇中):
-                // y = (-1)*(1*1) + 6*1 + 0 = -1 + 6 = 5
-                //
-                // x が 3 の時 (頂点):
-                // y = (-1)*(3*3) + 6*3 + 0 = -9 + 18 = 9
-                //
-                // x が 5 の時 (下降中):
-                // y = (-1)*(5*5) + 6*5 + 0 = -25 + 30 = 5  <- x=1の時と同じ高さ！
-                //
-                // x が 6 の時 (着地):
-                // y = (-1)*(6*6) + 6*6 + 0 = -36 + 36 = 0
-                //
-                // この計算が、ものすごい速さで繰り返されて、放物線を描いている。
+                // (教育用コメントはすべて保持)
                 let y = (a * Math.pow(x, 2)) + (b * x) + c;
 
                 // 1. 先に着地判定を行い、yとxの最終値を確定させる
                 if (y < 0) {
                     y = 0;
                     isJumping = false;
-                    x = b / (-a); 
+                    x = -b / a; 
                     jumpHorizontalVelocity = 0;
                 }
 
@@ -324,6 +333,7 @@
                 }
 
                 if (showCoordinates) {
+                    // 頂点の表示ロジック
                     const vertexX = -b / (2 * a);
                     if (x >= vertexX && !isVertexLogged) {
                         const vertexY = (a * Math.pow(vertexX, 2)) + (b * vertexX) + c;
@@ -346,6 +356,7 @@
                         isVertexLogged = true;
                     }
                     
+                    // 整数点の表示ロジック
                     const currentIntX = Math.round(x);
                     if (currentIntX > 0 && Math.abs(x - currentIntX) < 0.05 && !loggedIntegers[currentIntX]) {
                         const intY = (a * Math.pow(currentIntX, 2)) + (b * currentIntX) + c;
@@ -369,6 +380,29 @@
 
                         loggedIntegers[currentIntX] = true;
                     }
+                    
+                    // ★★★ ここからが修正箇所 ★★★
+                    // 着地点の表示ロジック (ジャンプが終わった瞬間に一度だけ実行)
+                    if (!isJumping && !isLandingLogged) {
+                        const landingText = document.createElement('div');
+                        landingText.className = 'landing-text';
+                        landingText.innerText = `着地点 (${x.toFixed(2)}, 0)`;
+                        const textX = currentHorizontalPos - landingText.offsetWidth - 5; 
+                        const textY = canvas.height - GROUND_Y_PX - character.offsetHeight;
+                        landingText.style.left = `${textX}px`;
+                        landingText.style.top = `${textY}px`;
+                        gameWorld.appendChild(landingText);
+
+                        const landingDot = document.createElement('div');
+                        landingDot.className = 'landing-dot';
+                        const dotX = currentHorizontalPos + (character.offsetWidth / 2);
+                        const dotY = canvas.height - GROUND_Y_PX - (character.offsetHeight / 2);
+                        landingDot.style.left = `${dotX}px`;
+                        landingDot.style.top = `${dotY}px`;
+                        gameWorld.appendChild(landingDot);
+
+                        isLandingLogged = true;
+                    }
                 }
 
                 timeDisplay.innerText = x.toFixed(2);
@@ -383,7 +417,7 @@
 
         function resetJump() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            document.querySelectorAll('.coordinate-text, .coordinate-dot, .vertex-text, .vertex-dot').forEach(el => el.remove());
+            document.querySelectorAll('.coordinate-text, .coordinate-dot, .vertex-text, .vertex-dot, .landing-text, .landing-dot').forEach(el => el.remove());
             loggedIntegers = {};
             x = 0;
             isJumping = false;
