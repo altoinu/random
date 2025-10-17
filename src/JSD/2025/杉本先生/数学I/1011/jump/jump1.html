@@ -164,7 +164,7 @@
             <span id="bValue">6.0</span>
         </div>
         <div class="slider-container">
-            c (定数項, 開始高さ): <input type="range" id="cSlider" min="-10" max="10" step="0.5" value="-5">
+            c (定数項, 開始高さ): <input type="range" id="cSlider" min="-15" max="0" step="0.5" value="-5">
             <span id="cValue">-5.0</span>
         </div>
         <div id="discriminant-controls">
@@ -201,7 +201,8 @@
         // --- ゲームとしての見た目を調整する設定 ---
         const GROUND_Y_PX = 30; // 地面のCSS上の高さ(ピクセル)
         const HORIZONTAL_SPEED = 4; // 左右移動のスピード
-        const Y_SCALE = 20; // ★★★ 値を変更 ★★★ y座標の1単位を何ピクセルで表示するかの縮尺
+        const Y_SCALE = 20; // y座標の1単位を何ピクセルで表示するかの縮尺
+        const COIN_BASE_Y_PX = 130; // 地面からコイン(y=0)までのピクセル距離
 
         // --- HTML要素の取得 ---
         const gameWorld = document.getElementById('game-world');
@@ -219,13 +220,11 @@
         const aValue = document.getElementById('aValue');
         const bSlider = document.getElementById('bSlider');
         const bValue = document.getElementById('bValue');
-        // ★★★ ここから追加 ★★★
         const cSlider = document.getElementById('cSlider');
         const cValue = document.getElementById('cValue');
         const calculateDButton = document.getElementById('calculateD');
         const discriminantResult = document.getElementById('discriminant-result');
         const targetCoin = document.getElementById('target-coin');
-        // ★★★ ここまで追加 ★★★
 
         // --- 状態を保存する変数 ---
         let isJumping = false;
@@ -289,7 +288,6 @@
             resetJump();
         });
         
-        // ★★★ ここから追加 ★★★
         cSlider.addEventListener('input', (e) => {
             c = parseFloat(e.target.value);
             cValue.textContent = c.toFixed(1);
@@ -318,10 +316,8 @@
             }
             discriminantResult.innerHTML = resultHTML;
         };
-        // ★★★ ここまで追加 ★★★
         
         function updateEquationDisplay() {
-            // ★★★ ここを修正 ★★★
             const sign = c >= 0 ? '+' : '-';
             equationDisplay.innerHTML = `ジャンプの軌道 (2次関数): <code>y = ${a.toFixed(1)}x² + ${b.toFixed(1)}x ${sign} ${Math.abs(c).toFixed(1)}</code>`;
         }
@@ -396,7 +392,6 @@
                 // 教科書の式 y = ax^2 + bx + c がそのままコードになっている！
                 let y = (a * Math.pow(x, 2)) + (b * x) + c;
                 
-                // ★★★ ここからロジックを修正 ★★★
                 // 1. 先に着地判定(地面との衝突)を行い、yとxの最終値を確定させる
                 // y_cssはキャラクターの視覚的な開始点(地面)からの高さの変化量
                 let y_css = GROUND_Y_PX + ((y - c) * Y_SCALE);
